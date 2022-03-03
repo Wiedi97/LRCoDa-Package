@@ -2,6 +2,7 @@
 #' @importFrom dplyr select
 #' @importFrom dplyr filter
 #' @import tidyr
+#' @importFrom robCompositions pivotCoord
 NULL
 
 
@@ -35,8 +36,8 @@ NULL
 #' gemas_GER <- dplyr::filter(gemas, gemas$COUNTRY == 'GER')
 #' y <- gemas_GER$sand
 #' X <- dplyr::select(gemas_GER, c(MeanTemp, soilclass, Al:Zr))
-#' LRCoDa(y, X, external = c('MeanTemp'), factor_column = c('soilClass), method='classical', method_pivot = 'orthonormal')
-#' LRCoDa(y, X, external = c('MeanTemp'), factor_column = c('soilClass), method='robust', method_pivot = 'orthonormal')
+#' LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass', method='classical', method_pivot = 'orthonormal')
+#' LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass', method='robust', method_pivot = 'orthonormal')
 LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robust", method_pivot = 'orthonormal') { # ltsReg mit lmrob ersetzen und dann sollte die Fehlermeldung verschwinden
 
   if (!is.null(external)) {
@@ -46,7 +47,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
   if (!is.null(factor_column)) {
     factor_var <- X %>% select(factor_column)
     factor_col <- factor_var[, 1]
-    n_levels <- length(levels(factor_col))
+    n_levels <- length(unique(as.character(factor_col)))
   }
   ilrregression <- function(X, y, external, factor_column, method_pivot) {
 

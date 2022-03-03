@@ -49,8 +49,8 @@ gemas$COUNTRY <- as.factor(gemas$COUNTRY)
 gemas_GER <- dplyr::filter(gemas, gemas$COUNTRY == 'GER')
 y <- gemas_GER$sand
 X <- dplyr::select(gemas_GER, c(MeanTemp, soilclass, Al:Zr))
-LRCoDa(y, X, external = c('MeanTemp'), factor_column = c('soilClass), method='classical', method_pivot = 'orthonormal')
-LRCoDa(y, X, external = c('MeanTemp'), factor_column = c('soilClass), method='robust', method_pivot = 'orthonormal')
+LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass', method='classical', method_pivot = 'orthonormal')
+LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass', method='robust', method_pivot = 'orthonormal')
 }
 \seealso{
 \code{\link{lm}} and \code{\link{lmrob}}
