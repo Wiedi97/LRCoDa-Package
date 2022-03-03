@@ -1,0 +1,8 @@
+.Random.seed
+.Rhistory
+.gitignore
+.git
+^.*\.Rproj$
+^\.Rproj\.user$
+^packrat/
+^\.Rprofile$
