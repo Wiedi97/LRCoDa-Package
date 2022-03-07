@@ -6,3 +6,4 @@
 ^\.Rproj\.user$
 ^packrat/
 ^\.Rprofile$
+^LICENSE\.md$
