@@ -1,5 +1,6 @@
 .DS_Store
 LRCoDa.Rproj
+LICENSE.md
 .Rhistory
 vignettes/imputation.synctex.gz
 vignettes/imputation-concordance.tex
