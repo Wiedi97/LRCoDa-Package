@@ -1,8 +1,9 @@
 #' @importFrom stats lm
-#' @importFrom dplyr select
-#' @importFrom dplyr filter
+#' @import dplyr
 #' @import tidyr
+#' @importFrom robustbase lmrob
 #' @importFrom robCompositions pivotCoord
+#' @importFrom sjmisc is_empty
 NULL
 
 
@@ -10,7 +11,7 @@ NULL
 #'
 #' Delivers appropriate inference for regression of y on compositional and/or non-compositional input X.
 #'
-#' Compositional explanatory variables should
+#' Compositional explanatory variables should (write more)
 #'
 #' @aliases LRCoDa ilrregression robilrregression
 #' @param y The response which should be non-compositional (Better explanation)
@@ -28,31 +29,45 @@ NULL
 #' @export
 #' @examples
 #'
-#' ## How the content of sand of the agricultural and grazing land soils
-#' ## in Germany depend on relative contributions of the main chemical trace elements,
+#' ## How the content of sand of the agricultural
+#' ## and grazing land soils in Germany depend on
+#' ## relative contributions of the main chemical trace elements,
 #' ## their different soil types and the Annual mean temperature:
 #' data("gemas")
 #' gemas$COUNTRY <- as.factor(gemas$COUNTRY)
 #' gemas_GER <- dplyr::filter(gemas, gemas$COUNTRY == 'GER')
 #' y <- gemas_GER$sand
 #' X <- dplyr::select(gemas_GER, c(MeanTemp, soilclass, Al:Zr))
-#' LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass', method='classical', method_pivot = 'orthonormal')
-#' LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass', method='robust', method_pivot = 'orthonormal')
+#' LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
+#' method='classical', method_pivot = 'orthonormal')
+#' LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
+#' method='robust', method_pivot = 'orthonormal')
 LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robust", method_pivot = 'orthonormal') { # ltsReg mit lmrob ersetzen und dann sollte die Fehlermeldung verschwinden
 
-  if (!is.null(external)) {
-    external_col <- X %>% select(external)
-    n_externals <- length(external_col)
+  if (!is.null(external)){
+    external_col <- X %>% select(all_of(external))
+    if (sapply(external_col, function(x) is.numeric(x))){
+      n_externals <- length(external_col)
+    } else {
+      stop("Datatype of 'external' has to be numeric")
+    }
   }
   if (!is.null(factor_column)) {
-    factor_var <- X %>% select(factor_column)
+    factor_var <- X %>% select(all_of(factor_column))
     factor_col <- factor_var[, 1]
-    n_levels <- length(unique(as.character(factor_col)))
+    if (is.factor(factor_col) | is.character(factor_col)){
+      n_levels <- length(unique(as.character(factor_col)))
+    } else {
+      stop("Datatype of 'factor_column' has to be factor or character")
+    }
+    if (any(is_empty(unique(as.character(factor_col)), first.only = FALSE, all.na.empty = TRUE) == TRUE)){
+      stop("Dataset contains levels with empty strings or missing values. Specify factor name or drop these observations.")
+    }
   }
   ilrregression <- function(X, y, external, factor_column, method_pivot) {
 
     if (!is.null(factor_column) & !is.null(external)){
-      X_selected <- X %>% select(-c(external, factor_column))
+      X_selected <- X %>% select(-all_of(c(external, factor_column)))
       ZV <- data.frame(Factor = factor_col, Externals = external_col, X = X_selected)
       d <- data.frame(y = y, X = ZV)
       lmcla <- lm(y ~ ., data = d)
@@ -60,8 +75,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-1-n_externals)) {
-        X_prep <- X %>% select(-c(external, factor_column))   # Take X_selected
-        Zj <- pivotCoord(cbind(X_prep[, j], X_prep[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
         ZVj <- data.frame(Factor = factor_col, Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- lm(y ~ ., data = dj)
@@ -105,7 +119,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       }
     }
     if (!is.null(factor_column) & is.null(external)){
-      X_selected <- X %>% select(-c(factor_column))
+      X_selected <- X %>% select(-all_of(c(factor_column)))
       ZV <- data.frame(Factor = factor_col, X = X_selected)
       d <- data.frame(y = y, X = ZV)
       lmcla <- lm(y ~ ., data = d)
@@ -113,8 +127,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-1)) {
-        X_prep <- X %>% select(-c(factor_column))
-        Zj <- pivotCoord(cbind(X_prep[, j], X_prep[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
         ZVj <- data.frame(Factor = factor_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- lm(y ~ ., data = dj)
@@ -133,7 +146,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       }
     }
     if (is.null(factor_column) & !is.null(external)){
-      X_selected <- X %>% select(-c(external))
+      X_selected <- X %>% select(-all_of(c(external)))
       ZV <- data.frame(Externals = external_col, X = X_selected)
       d <- data.frame(y = y, X = ZV)
       lmcla <- lm(y ~ ., data = d)
@@ -141,8 +154,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-n_externals)) {
-        X_prep <- X %>% select(-c(external))
-        Zj <- pivotCoord(cbind(X_prep[, j], X_prep[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
         ZVj <- data.frame(Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- lm(y ~ ., data = dj)
@@ -165,7 +177,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
   robilrregression <- function(X, y, external, factor_column, method_pivot) {
 
     if (!is.null(factor_column) & !is.null(external)){
-      X_selected <- X %>% select(-c(external, factor_column))  ## maybe we can work with relocate from the dyplr Package
+      X_selected <- X %>% select(-all_of(c(external, factor_column)))   ## maybe we can work with relocate from the dyplr Package
       ZV <- data.frame(Factor = factor_col, Externals = external_col, X = X_selected)  ## maybe we can work with relocate from the dyplr Package
       d <- data.frame(y = y, X = ZV)    ## Double indexing Main ELements with X prefix (X.X)
       lmcla <- robustbase::lmrob(y ~ ., data = d)
@@ -173,8 +185,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-1-n_externals)) {
-        X_prep <- X %>% select(-c(external, factor_column))
-        Zj <- pivotCoord(cbind(X_prep[, j], X_prep[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
         ZVj <- data.frame(Factor = factor_col, Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- robustbase::lmrob(y ~ ., data = dj)
@@ -215,7 +226,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       }
     }
     if (!is.null(factor_column) & is.null(external)){
-      X_selected <- X %>% select(-c(factor_column))
+      X_selected <- X %>% select(-all_of(c(factor_column)))
       ZV <- data.frame(Factor = factor_col, X = X_selected)
       d <- data.frame(y = y, X = ZV)
       lmcla <- robustbase::lmrob(y ~ ., data = d)
@@ -223,8 +234,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-1)) {
-        X_prep <- X %>% select(-c(factor_column))
-        Zj <- pivotCoord(cbind(X_prep[, j], X_prep[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
         ZVj <- data.frame(Factor = factor_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- robustbase::lmrob(y ~ ., data = dj)
@@ -242,7 +252,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       }
     }
     if (is.null(factor_column) & !is.null(external)){
-      X_selected <- X %>% select(-c(external))
+      X_selected <- X %>% select(-all_of(c(external)))
       ZV <- data.frame(Externals = external_col, X = X_selected)
       d <- data.frame(y = y, X = ZV)
       lmcla <- robustbase::lmrob(y ~ ., data = d)
@@ -250,8 +260,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-n_externals)) {
-        X_prep <- X %>% select(-c(external))
-        Zj <- pivotCoord(cbind(X_prep[, j], X_prep[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
         ZVj <- data.frame(Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- robustbase::lmrob(y ~ ., data = dj)

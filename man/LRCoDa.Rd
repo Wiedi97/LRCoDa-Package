@@ -37,20 +37,23 @@ objects.
 Delivers appropriate inference for regression of y on compositional and/or non-compositional input X.
 }
 \details{
-Compositional explanatory variables should
+Compositional explanatory variables should (write more)
 }
 \examples{
 
-## How the content of sand of the agricultural and grazing land soils
-## in Germany depend on relative contributions of the main chemical trace elements,
+## How the content of sand of the agricultural
+## and grazing land soils in Germany depend on
+## relative contributions of the main chemical trace elements,
 ## their different soil types and the Annual mean temperature:
 data("gemas")
 gemas$COUNTRY <- as.factor(gemas$COUNTRY)
 gemas_GER <- dplyr::filter(gemas, gemas$COUNTRY == 'GER')
 y <- gemas_GER$sand
 X <- dplyr::select(gemas_GER, c(MeanTemp, soilclass, Al:Zr))
-LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass', method='classical', method_pivot = 'orthonormal')
-LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass', method='robust', method_pivot = 'orthonormal')
+LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
+method='classical', method_pivot = 'orthonormal')
+LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
+method='robust', method_pivot = 'orthonormal')
 }
 \seealso{
 \code{\link{lm}} and \code{\link{lmrob}}
