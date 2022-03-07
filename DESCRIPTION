@@ -6,20 +6,23 @@ Date: 2022-03-01
 Imports: 
     dplyr,
     robCompositions,
-    tidyr
+    tidyr,
+    robustbase, 
+    sjmisc
 Author: person("Roman", "Wiedemeier", email="wiedemeier.roman@gmail.com", role=c("aut", "cre"))
 Maintainer: Roman Wiedemeier <wiedemeier.roman@gmail.com>
 Description: More about what it does (maybe more than one line)
     Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+License: GPL (>= 3)
 Encoding: UTF-8
 LazyLoad: yes
 LazyData: true
 Suggests: 
     knitr,
-    rmarkdown, 
-    testthat
+    rmarkdown,
+    testthat (>= 3.0.0)
 VignetteBuilder: knitr
 RoxygenNote: 7.1.2
 Depends: 
     R (>= 2.10)
+Config/testthat/edition: 3
