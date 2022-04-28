@@ -2,6 +2,7 @@
 #' @import dplyr
 #' @import tidyr
 #' @importFrom robustbase lmrob
+#' @importFrom robustbase lmrob.control
 #' @importFrom robCompositions pivotCoord
 #' @importFrom sjmisc is_empty
 NULL
@@ -44,12 +45,23 @@ NULL
 #' method='robust', method_pivot = 'orthonormal')
 LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robust", method_pivot = 'orthonormal') { # ltsReg mit lmrob ersetzen und dann sollte die Fehlermeldung verschwinden
 
+  if (any(is.na(y))){
+    dat <- cbind(y, X)
+    dat_missing <- dat %>% filter(is.na(y))
+    n <- dim(dat_missing)[1]
+    dat_new <- dat %>% filter(!is.na(y))
+
+    X <- dat_new %>% select(-c(y))
+    y <- dat_new %>% select(c(y))
+
+    cat("There are", n ,"observations omitted due to missings in the target variable")
+  }
   if (!is.null(external)){
     external_col <- X %>% select(all_of(external))
-    if (sapply(external_col, function(x) is.numeric(x))){
+    if (all(sapply(external_col, function(x) is.numeric(x)))){
       n_externals <- length(external_col)
     } else {
-      stop("Datatype of 'external' has to be numeric")
+      stop("Datatype of all 'external' variables have to be numeric")
     }
   }
   if (!is.null(factor_column)) {
@@ -175,12 +187,13 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
     list(lm = lmcla, lm = lmcla.sum, ilr = ilr.sum)
   }
   robilrregression <- function(X, y, external, factor_column, method_pivot) {
+    cont_lmrob <- lmrob.control(fast.s.large.n = Inf)
 
     if (!is.null(factor_column) & !is.null(external)){
       X_selected <- X %>% select(-all_of(c(external, factor_column)))   ## maybe we can work with relocate from the dyplr Package
       ZV <- data.frame(Factor = factor_col, Externals = external_col, X = X_selected)  ## maybe we can work with relocate from the dyplr Package
       d <- data.frame(y = y, X = ZV)    ## Double indexing Main ELements with X prefix (X.X)
-      lmcla <- robustbase::lmrob(y ~ ., data = d)
+      lmcla <- robustbase::lmrob(y ~ ., data = d, control = cont_lmrob)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -188,7 +201,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
         Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
         ZVj <- data.frame(Factor = factor_col, Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
-        res <- robustbase::lmrob(y ~ ., data = dj)
+        res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
         res.sum <- summary(res)
         if (j == 1) {
           ilr.sum$coefficients[1:(n_levels+n_externals+1), ] <- res.sum$coefficients[1:(n_levels+n_externals+1), ]
@@ -204,14 +217,14 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
     }
     if (is.null(factor_column) & is.null(external)){
       d <- data.frame(y = y, X = X)
-      lmcla <- robustbase::lmrob(y ~ ., data = d)
+      lmcla <- robustbase::lmrob(y ~ ., data = d, control = cont_lmrob)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
       for (j in 1:ncol(X)) {
         Zj <- pivotCoord(cbind(X[, j], X[, -j]), method = method_pivot)
         dj <- data.frame(y = y, Z = Zj)
-        res <- robustbase::lmrob(y ~ ., data = dj)
+        res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
         res.sum <- summary(res)
         if (j == 1) {
           ilr.sum$coefficients[1:2, ] <- res.sum$coefficients[1:2, ]
@@ -229,7 +242,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       X_selected <- X %>% select(-all_of(c(factor_column)))
       ZV <- data.frame(Factor = factor_col, X = X_selected)
       d <- data.frame(y = y, X = ZV)
-      lmcla <- robustbase::lmrob(y ~ ., data = d)
+      lmcla <- robustbase::lmrob(y ~ ., data = d, control = cont_lmrob)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -237,7 +250,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
         Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
         ZVj <- data.frame(Factor = factor_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
-        res <- robustbase::lmrob(y ~ ., data = dj)
+        res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
         res.sum <- summary(res)
         if (j == 1) {
           ilr.sum$coefficients[1:(n_levels+1), ] <- res.sum$coefficients[1:(n_levels+1), ]
@@ -255,7 +268,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       X_selected <- X %>% select(-all_of(c(external)))
       ZV <- data.frame(Externals = external_col, X = X_selected)
       d <- data.frame(y = y, X = ZV)
-      lmcla <- robustbase::lmrob(y ~ ., data = d)
+      lmcla <- robustbase::lmrob(y ~ ., data = d, control = cont_lmrob)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -263,7 +276,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
         Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
         ZVj <- data.frame(Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
-        res <- robustbase::lmrob(y ~ ., data = dj)
+        res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
         res.sum <- summary(res)
         if (j == 1) {
           ilr.sum$coefficients[1:(n_externals+2), ] <- res.sum$coefficients[1:(n_externals+2), ]
