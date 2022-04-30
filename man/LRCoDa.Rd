@@ -4,7 +4,7 @@
 \alias{LRCoDa}
 \alias{ilrregression}
 \alias{robilrregression}
-\title{Classical and robust regression of non-compositional (real) response on compositional and/or non-compositional predictors}
+\title{Classical and robust regression of non-compositional (real) response on compositional and non-compositional predictors combined}
 \usage{
 LRCoDa(
   y,
@@ -12,32 +12,40 @@ LRCoDa(
   external = NULL,
   factor_column = NULL,
   method = "robust",
-  method_pivot = "orthonormal"
+  pivot_norm = "orthonormal",
+  max_refinement_steps = 200
 )
 }
 \arguments{
-\item{y}{The response which should be non-compositional (Better explanation)}
+\item{y}{The response which should be non-compositional}
 
-\item{X}{The compositional and/or non-compositional predictors as a matrix, data.frame or numeric vector (Probably a refactoring done)}
+\item{X}{The compositional and/or non-compositional predictors as a matrix, data.frame or numeric vector}
 
-\item{external}{Specify the columns which are not part of the composition}
+\item{external}{Specify the columns which are not part of the composition and not factors}
 
 \item{factor_column}{Specify the column which includes factor levels}
 
-\item{method}{If robust, the fast MM-type linear regression is applied, while with method
+\item{method}{If \dQuote{robust}, the fast MM-type linear regression is applied, while with method
 \dQuote{classical}, the conventional least squares regression is applied.}
 
-\item{method_pivot}{Method to choose the pivot coordinates (parameters pivotvar and norm have then no effect)}
+\item{pivot_norm}{if FALSE then the normalizing constant is not used, if TRUE sqrt((D-i)/(D-i+1))
+is used (default). The user can also specify a self-defined constant}
+
+\item{max_refinement_steps}{(for the fast-S algorithm): maximal number of refinement
+steps for the “fully” iterated best candidates.}
 }
 \value{
 An object of class \sQuote{lmrob} or \sQuote{lm} and two summary
 objects.
 }
 \description{
-Delivers appropriate inference for regression of y on compositional and/or non-compositional input X.
+Delivers appropriate inference for regression of y on compositional and non-compositional combined input X.
 }
 \details{
-Compositional explanatory variables should (write more)
+Compositional explanatory variables should not be directly used in a linear regression model because any inference statistic
+can become misleading. While various approaches for this problem were proposed, here an approach based on the pivot coordinates
+is used. Further these compositional explanatory variables can be supplemented with external non-compositional data
+and factor variables.
 }
 \examples{
 
@@ -51,9 +59,9 @@ gemas_GER <- dplyr::filter(gemas, gemas$COUNTRY == 'GER')
 y <- gemas_GER$sand
 X <- dplyr::select(gemas_GER, c(MeanTemp, soilclass, Al:Zr))
 LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
-method='classical', method_pivot = 'orthonormal')
+method='classical', pivot_norm = 'orthonormal')
 LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
-method='robust', method_pivot = 'orthonormal')
+method='robust', pivot_norm = 'orthonormal')
 }
 \seealso{
 \code{\link{lm}} and \code{\link{lmrob}}
