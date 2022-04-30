@@ -8,20 +8,26 @@
 NULL
 
 
-#' Classical and robust regression of non-compositional (real) response on compositional and/or non-compositional predictors
+#' Classical and robust regression of non-compositional (real) response on compositional and non-compositional predictors combined
 #'
-#' Delivers appropriate inference for regression of y on compositional and/or non-compositional input X.
+#' Delivers appropriate inference for regression of y on compositional and non-compositional combined input X.
 #'
-#' Compositional explanatory variables should (write more)
+#' Compositional explanatory variables should not be directly used in a linear regression model because any inference statistic
+#' can become misleading. While various approaches for this problem were proposed, here an approach based on the pivot coordinates
+#' is used. Further these compositional explanatory variables can be supplemented with external non-compositional data
+#' and factor variables.
 #'
 #' @aliases LRCoDa ilrregression robilrregression
-#' @param y The response which should be non-compositional (Better explanation)
-#' @param X The compositional and/or non-compositional predictors as a matrix, data.frame or numeric vector (Probably a refactoring done)
-#' @param external Specify the columns which are not part of the composition
+#' @param y The response which should be non-compositional
+#' @param X The compositional and/or non-compositional predictors as a matrix, data.frame or numeric vector
+#' @param external Specify the columns which are not part of the composition and not factors
 #' @param factor_column Specify the column which includes factor levels
-#' @param method If robust, the fast MM-type linear regression is applied, while with method
+#' @param method If \dQuote{robust}, the fast MM-type linear regression is applied, while with method
 #' \dQuote{classical}, the conventional least squares regression is applied.
-#' @param method_pivot Method to choose the pivot coordinates (parameters pivotvar and norm have then no effect)
+#' @param pivot_norm if FALSE then the normalizing constant is not used, if TRUE sqrt((D-i)/(D-i+1))
+#' is used (default). The user can also specify a self-defined constant
+#' @param max_refinement_steps (for the fast-S algorithm): maximal number of refinement
+#' steps for the “fully” iterated best candidates.
 #' @return An object of class \sQuote{lmrob} or \sQuote{lm} and two summary
 #' objects.
 #' @author Roman Wiedemeier
@@ -40,11 +46,23 @@ NULL
 #' y <- gemas_GER$sand
 #' X <- dplyr::select(gemas_GER, c(MeanTemp, soilclass, Al:Zr))
 #' LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
-#' method='classical', method_pivot = 'orthonormal')
+#' method='classical', pivot_norm = 'orthonormal')
 #' LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
-#' method='robust', method_pivot = 'orthonormal')
-LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robust", method_pivot = 'orthonormal') { # ltsReg mit lmrob ersetzen und dann sollte die Fehlermeldung verschwinden
+#' method='robust', pivot_norm = 'orthonormal')
+LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robust", pivot_norm = 'orthonormal', max_refinement_steps = 200) { # ltsReg mit lmrob ersetzen und dann sollte die Fehlermeldung verschwinden
 
+  if ((typeof(external) != "character")) {
+    stop("Invalid datatype for external")
+  }
+  if ((typeof(factor_column) != "character")) {
+    stop("Invalid datatype for factor_column")
+  }
+  if (is.null(factor_column) & (any(sapply(X, function(x) !is.numeric(x))))) {
+    stop("X contains non-numerical variables but there is no factor_column defined")
+  }
+  if (length(factor_column) > 1) {
+    stop("There are more than 1 factor variable defined")
+  }
   if (any(is.na(y))){
     dat <- cbind(y, X)
     dat_missing <- dat %>% filter(is.na(y))
@@ -53,8 +71,6 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
 
     X <- dat_new %>% select(-c(y))
     y <- dat_new %>% select(c(y))
-
-    cat("There are", n ,"observations omitted due to missings in the target variable")
   }
   if (!is.null(external)){
     external_col <- X %>% select(all_of(external))
@@ -76,7 +92,8 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       stop("Dataset contains levels with empty strings or missing values. Specify factor name or drop these observations.")
     }
   }
-  ilrregression <- function(X, y, external, factor_column, method_pivot) {
+
+  ilrregression <- function(X, y, external, factor_column, pivot_norm) {
 
     if (!is.null(factor_column) & !is.null(external)){
       X_selected <- X %>% select(-all_of(c(external, factor_column)))
@@ -87,7 +104,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-1-n_externals)) {
-        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
         ZVj <- data.frame(Factor = factor_col, Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- lm(y ~ ., data = dj)
@@ -113,7 +130,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:ncol(X)) {
-        Zj <- pivotCoord(cbind(X[, j], X[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X[, j], X[, -j]), method = pivot_norm)
         dj <- data.frame(y = y, Z = Zj)
         res <- lm(y ~ ., data = dj)
         res.sum <- summary(res)
@@ -139,7 +156,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-1)) {
-        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
         ZVj <- data.frame(Factor = factor_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- lm(y ~ ., data = dj)
@@ -166,7 +183,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-n_externals)) {
-        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
         ZVj <- data.frame(Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- lm(y ~ ., data = dj)
@@ -186,8 +203,9 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
     }
     list(lm = lmcla, lm = lmcla.sum, ilr = ilr.sum)
   }
-  robilrregression <- function(X, y, external, factor_column, method_pivot) {
-    cont_lmrob <- lmrob.control(fast.s.large.n = Inf)
+
+  robilrregression <- function(X, y, external, factor_column, pivot_norm) {
+    cont_lmrob <- lmrob.control(fast.s.large.n = Inf, k.max = max_refinement_steps)
 
     if (!is.null(factor_column) & !is.null(external)){
       X_selected <- X %>% select(-all_of(c(external, factor_column)))   ## maybe we can work with relocate from the dyplr Package
@@ -198,7 +216,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-1-n_externals)) {
-        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
         ZVj <- data.frame(Factor = factor_col, Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
@@ -222,7 +240,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:ncol(X)) {
-        Zj <- pivotCoord(cbind(X[, j], X[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X[, j], X[, -j]), method = pivot_norm)
         dj <- data.frame(y = y, Z = Zj)
         res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
         res.sum <- summary(res)
@@ -247,7 +265,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-1)) {
-        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
         ZVj <- data.frame(Factor = factor_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
@@ -273,7 +291,7 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       ilr.sum <- lmcla.sum
 
       for (j in 1:(ncol(X)-n_externals)) {
-        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = method_pivot)
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
         ZVj <- data.frame(Externals = external_col, Z = Zj)
         dj <- data.frame(y = y, Z = ZVj)
         res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
@@ -292,11 +310,15 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
     }
     list(lm = lmcla, lm = lmcla.sum, ilr = ilr.sum)
   }
+
   if (method == "classical") {
-    reg <- ilrregression(X, y, external, factor_column, method_pivot)
+    reg <- ilrregression(X, y, external, factor_column, pivot_norm)
   }
   else if (method == "robust") {
-    reg <- robilrregression(X, y, external, factor_column, method_pivot)
+    reg <- robilrregression(X, y, external, factor_column, pivot_norm)
+  }
+  if (exists("dat_missing")) {
+    message("There are ", n ," observations omitted due to missings in the target variable")
   }
   return(reg)
 }
