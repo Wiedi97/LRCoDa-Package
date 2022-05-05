@@ -51,10 +51,10 @@ NULL
 #' method='robust', pivot_norm = 'orthonormal')
 LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robust", pivot_norm = 'orthonormal', max_refinement_steps = 200) { # ltsReg mit lmrob ersetzen und dann sollte die Fehlermeldung verschwinden
 
-  if ((typeof(external) != "character")) {
+  if (!is.null(external) & (typeof(external) != "character")) {
     stop("Invalid datatype for external")
   }
-  if ((typeof(factor_column) != "character")) {
+  if (!is.null(factor_column) & (typeof(factor_column) != "character")) {
     stop("Invalid datatype for factor_column")
   }
   if (is.null(factor_column) & (any(sapply(X, function(x) !is.numeric(x))))) {
@@ -97,9 +97,10 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
 
     if (!is.null(factor_column) & !is.null(external)){
       X_selected <- X %>% select(-all_of(c(external, factor_column)))
-      ZV <- data.frame(Factor = factor_col, Externals = external_col, X = X_selected)
-      d <- data.frame(y = y, X = ZV)
-      lmcla <- lm(y ~ ., data = d)
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(factor_column, external))) %>% rename_with(.cols = colnames(X %>% select(all_of(factor_column))), function(x){paste0("Factor.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(all_of(external))), function(x){paste0("External.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(external, factor_column)))), function(x){paste0("Internal.", x)})))
+      lmcla <- lm(y ~ ., data = ZV)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -124,8 +125,8 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       }
     }
     if (is.null(factor_column) & is.null(external)){
-      d <- data.frame(y = y, X = X)
-      lmcla <- lm(y ~ ., data = d)
+      ZV <- data.frame(cbind(y, X %>% rename_with(.cols = everything(), function(x){paste0("Internal.", x)})))
+      lmcla <- lm(y ~ ., data = ZV)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -149,9 +150,9 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
     }
     if (!is.null(factor_column) & is.null(external)){
       X_selected <- X %>% select(-all_of(c(factor_column)))
-      ZV <- data.frame(Factor = factor_col, X = X_selected)
-      d <- data.frame(y = y, X = ZV)
-      lmcla <- lm(y ~ ., data = d)
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(factor_column))) %>% rename_with(.cols = colnames(X %>% select(all_of(factor_column))), function(x){paste0("Factor.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(factor_column)))), function(x){paste0("Internal.", x)})))
+      lmcla <- lm(y ~ ., data = ZV)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -176,9 +177,9 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
     }
     if (is.null(factor_column) & !is.null(external)){
       X_selected <- X %>% select(-all_of(c(external)))
-      ZV <- data.frame(Externals = external_col, X = X_selected)
-      d <- data.frame(y = y, X = ZV)
-      lmcla <- lm(y ~ ., data = d)
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(external))) %>% rename_with(.cols = colnames(X %>% select(all_of(external))), function(x){paste0("External.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(external)))), function(x){paste0("Internal.", x)})))
+      lmcla <- lm(y ~ ., data = ZV)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -209,9 +210,10 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
 
     if (!is.null(factor_column) & !is.null(external)){
       X_selected <- X %>% select(-all_of(c(external, factor_column)))   ## maybe we can work with relocate from the dyplr Package
-      ZV <- data.frame(Factor = factor_col, Externals = external_col, X = X_selected)  ## maybe we can work with relocate from the dyplr Package
-      d <- data.frame(y = y, X = ZV)    ## Double indexing Main ELements with X prefix (X.X)
-      lmcla <- robustbase::lmrob(y ~ ., data = d, control = cont_lmrob)
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(factor_column, external))) %>% rename_with(.cols = colnames(X %>% select(all_of(factor_column))), function(x){paste0("Factor.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(all_of(external))), function(x){paste0("External.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(external, factor_column)))), function(x){paste0("Internal.", x)})))
+      lmcla <- robustbase::lmrob(y ~ ., data = ZV, control = cont_lmrob)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -234,8 +236,8 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
       }
     }
     if (is.null(factor_column) & is.null(external)){
-      d <- data.frame(y = y, X = X)
-      lmcla <- robustbase::lmrob(y ~ ., data = d, control = cont_lmrob)
+      ZV <- data.frame(cbind(y, X %>% rename_with(.cols = everything(), function(x){paste0("Internal.", x)})))
+      lmcla <- robustbase::lmrob(y ~ ., data = ZV, control = cont_lmrob)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -258,9 +260,9 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
     }
     if (!is.null(factor_column) & is.null(external)){
       X_selected <- X %>% select(-all_of(c(factor_column)))
-      ZV <- data.frame(Factor = factor_col, X = X_selected)
-      d <- data.frame(y = y, X = ZV)
-      lmcla <- robustbase::lmrob(y ~ ., data = d, control = cont_lmrob)
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(factor_column))) %>% rename_with(.cols = colnames(X %>% select(all_of(factor_column))), function(x){paste0("Factor.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(factor_column)))), function(x){paste0("Internal.", x)})))
+      lmcla <- robustbase::lmrob(y ~ ., data = ZV, control = cont_lmrob)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
@@ -284,9 +286,9 @@ LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robus
     }
     if (is.null(factor_column) & !is.null(external)){
       X_selected <- X %>% select(-all_of(c(external)))
-      ZV <- data.frame(Externals = external_col, X = X_selected)
-      d <- data.frame(y = y, X = ZV)
-      lmcla <- robustbase::lmrob(y ~ ., data = d, control = cont_lmrob)
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(external))) %>% rename_with(.cols = colnames(X %>% select(all_of(external))), function(x){paste0("External.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(external)))), function(x){paste0("Internal.", x)})))
+      lmcla <- robustbase::lmrob(y ~ ., data = ZV, control = cont_lmrob)
       lmcla.sum <- summary(lmcla)
       ilr.sum <- lmcla.sum
 
