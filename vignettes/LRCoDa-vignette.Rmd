@@ -14,6 +14,388 @@ knitr::opts_chunk$set(
 )
 ```
 
+## 1. Load Dependencies
+
 ```{r setup}
-library(LRCoDa)
+# library(LRCoDa)
+library(robCompositions)
+library(dplyr)
+library(sjmisc)
+library(robustbase)
+library(forcats)
+```
+
+```{r, include = FALSE}
+LRCoDa <- function (y, X, external = NULL, factor_column = NULL, method = "robust", pivot_norm = 'orthonormal', max_refinement_steps = 200) { # ltsReg mit lmrob ersetzen und dann sollte die Fehlermeldung verschwinden
+
+  if (!is.null(external) & (typeof(external) != "character")) {
+    stop("Invalid datatype for external")
+  }
+  if (!is.null(factor_column) & (typeof(factor_column) != "character")) {
+    stop("Invalid datatype for factor_column")
+  }
+  if (is.null(factor_column) & (any(sapply(X, function(x) !is.numeric(x))))) {
+    stop("X contains non-numerical variables but there is no factor_column defined")
+  }
+  if (length(factor_column) > 1) {
+    stop("There are more than 1 factor variable defined")
+  }
+  if (any(is.na(y))){
+    dat <- cbind(y, X)
+    dat_missing <- dat %>% filter(is.na(y))
+    n <- dim(dat_missing)[1]
+    dat_new <- dat %>% filter(!is.na(y))
+
+    X <- dat_new %>% select(-c(y))
+    y <- dat_new %>% select(c(y))
+  }
+  if (!is.null(external)){
+    external_col <- X %>% select(all_of(external))
+    if (all(sapply(external_col, function(x) is.numeric(x)))){
+      n_externals <- length(external_col)
+    } else {
+      stop("Datatype of all 'external' variables have to be numeric")
+    }
+  }
+  if (!is.null(factor_column)) {
+    factor_var <- X %>% select(all_of(factor_column))
+    factor_col <- factor_var[, 1]
+    if (is.factor(factor_col) | is.character(factor_col)){
+      n_levels <- length(unique(as.character(factor_col)))
+    } else {
+      stop("Datatype of 'factor_column' has to be factor or character")
+    }
+    if (any(is_empty(unique(as.character(factor_col)), first.only = FALSE, all.na.empty = TRUE) == TRUE)){
+      stop("Dataset contains levels with empty strings or missing values. Specify factor name or drop these observations.")
+    }
+  }
+
+  ilrregression <- function(X, y, external, factor_column, pivot_norm) {
+
+    if (!is.null(factor_column) & !is.null(external)){
+      X_selected <- X %>% select(-all_of(c(external, factor_column)))
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(factor_column, external))) %>% rename_with(.cols = colnames(X %>% select(all_of(factor_column))), function(x){paste0("Factor.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(all_of(external))), function(x){paste0("External.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(external, factor_column)))), function(x){paste0("Internal.", x)})))
+      lmcla <- lm(y ~ ., data = ZV)
+      lmcla.sum <- summary(lmcla)
+      ilr.sum <- lmcla.sum
+
+      for (j in 1:(ncol(X)-1-n_externals)) {
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
+        ZVj <- data.frame(Factor = factor_col, Externals = external_col, Z = Zj)
+        dj <- data.frame(y = y, Z = ZVj)
+        res <- lm(y ~ ., data = dj)
+        res.sum <- summary(res)
+        if (j == 1) {
+          ilr.sum$coefficients[1:(n_levels+n_externals+1), ] <- res.sum$coefficients[1:(n_levels+n_externals+1), ]
+          ilr.sum$residuals <- res.sum$residuals
+          ilr.sum$sigma <- res.sum$sigma
+          ilr.sum$r.squared <- res.sum$r.squared
+          ilr.sum$adj.r.squared <- res.sum$adj.r.squared
+          ilr.sum$fstatistic <- res.sum$fstatistic
+        }
+        else {
+          ilr.sum$coefficients[j + n_levels + n_externals, ] <- res.sum$coefficients[(n_levels+n_externals+1), ]
+
+        }
+      }
+    }
+    if (is.null(factor_column) & is.null(external)){
+      ZV <- data.frame(cbind(y, X %>% rename_with(.cols = everything(), function(x){paste0("Internal.", x)})))
+      lmcla <- lm(y ~ ., data = ZV)
+      lmcla.sum <- summary(lmcla)
+      ilr.sum <- lmcla.sum
+
+      for (j in 1:ncol(X)) {
+        Zj <- pivotCoord(cbind(X[, j], X[, -j]), method = pivot_norm)
+        dj <- data.frame(y = y, Z = Zj)
+        res <- lm(y ~ ., data = dj)
+        res.sum <- summary(res)
+        if (j == 1) {
+          ilr.sum$coefficients[1:2, ] <- res.sum$coefficients[1:2, ]
+          ilr.sum$residuals <- res.sum$residuals
+          ilr.sum$sigma <- res.sum$sigma
+          ilr.sum$r.squared <- res.sum$r.squared
+          ilr.sum$adj.r.squared <- res.sum$adj.r.squared
+          ilr.sum$fstatistic <- res.sum$fstatistic
+        }
+        else {
+          ilr.sum$coefficients[j + 1, ] <- res.sum$coefficients[2, ]
+        }
+      }
+    }
+    if (!is.null(factor_column) & is.null(external)){
+      X_selected <- X %>% select(-all_of(c(factor_column)))
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(factor_column))) %>% rename_with(.cols = colnames(X %>% select(all_of(factor_column))), function(x){paste0("Factor.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(factor_column)))), function(x){paste0("Internal.", x)})))
+      lmcla <- lm(y ~ ., data = ZV)
+      lmcla.sum <- summary(lmcla)
+      ilr.sum <- lmcla.sum
+
+      for (j in 1:(ncol(X)-1)) {
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
+        ZVj <- data.frame(Factor = factor_col, Z = Zj)
+        dj <- data.frame(y = y, Z = ZVj)
+        res <- lm(y ~ ., data = dj)
+        res.sum <- summary(res)
+        if (j == 1) {
+          ilr.sum$coefficients[1:(n_levels+1), ] <- res.sum$coefficients[1:(n_levels+1), ]
+          ilr.sum$residuals <- res.sum$residuals
+          ilr.sum$sigma <- res.sum$sigma
+          ilr.sum$r.squared <- res.sum$r.squared
+          ilr.sum$adj.r.squared <- res.sum$adj.r.squared
+          ilr.sum$fstatistic <- res.sum$fstatistic
+        }
+        else {
+          ilr.sum$coefficients[j + n_levels, ] <- res.sum$coefficients[(n_levels+1), ]
+        }
+      }
+    }
+    if (is.null(factor_column) & !is.null(external)){
+      X_selected <- X %>% select(-all_of(c(external)))
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(external))) %>% rename_with(.cols = colnames(X %>% select(all_of(external))), function(x){paste0("External.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(external)))), function(x){paste0("Internal.", x)})))
+      lmcla <- lm(y ~ ., data = ZV)
+      lmcla.sum <- summary(lmcla)
+      ilr.sum <- lmcla.sum
+
+      for (j in 1:(ncol(X)-n_externals)) {
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
+        ZVj <- data.frame(Externals = external_col, Z = Zj)
+        dj <- data.frame(y = y, Z = ZVj)
+        res <- lm(y ~ ., data = dj)
+        res.sum <- summary(res)
+        if (j == 1) {
+          ilr.sum$coefficients[1:(n_externals+2), ] <- res.sum$coefficients[1:(n_externals+2), ]
+          ilr.sum$residuals <- res.sum$residuals
+          ilr.sum$sigma <- res.sum$sigma
+          ilr.sum$r.squared <- res.sum$r.squared
+          ilr.sum$adj.r.squared <- res.sum$adj.r.squared
+          ilr.sum$fstatistic <- res.sum$fstatistic
+        }
+        else {
+          ilr.sum$coefficients[j + n_externals + 1, ] <- res.sum$coefficients[(n_externals+2), ]
+        }
+      }
+    }
+    list(lm = lmcla, lm = lmcla.sum, ilr = ilr.sum)
+  }
+
+  robilrregression <- function(X, y, external, factor_column, pivot_norm) {
+    cont_lmrob <- lmrob.control(fast.s.large.n = Inf, k.max = max_refinement_steps)
+
+    if (!is.null(factor_column) & !is.null(external)){
+      X_selected <- X %>% select(-all_of(c(external, factor_column)))   ## maybe we can work with relocate from the dyplr Package
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(factor_column, external))) %>% rename_with(.cols = colnames(X %>% select(all_of(factor_column))), function(x){paste0("Factor.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(all_of(external))), function(x){paste0("External.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(external, factor_column)))), function(x){paste0("Internal.", x)})))
+      lmcla <- robustbase::lmrob(y ~ ., data = ZV, control = cont_lmrob)
+      lmcla.sum <- summary(lmcla)
+      ilr.sum <- lmcla.sum
+
+      for (j in 1:(ncol(X)-1-n_externals)) {
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
+        ZVj <- data.frame(Factor = factor_col, Externals = external_col, Z = Zj)
+        dj <- data.frame(y = y, Z = ZVj)
+        res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
+        res.sum <- summary(res)
+        if (j == 1) {
+          ilr.sum$coefficients[1:(n_levels+n_externals+1), ] <- res.sum$coefficients[1:(n_levels+n_externals+1), ]
+          ilr.sum$residuals <- res.sum$residuals
+          ilr.sum$sigma <- res.sum$sigma
+          ilr.sum$r.squared <- res.sum$r.squared
+          ilr.sum$adj.r.squared <- res.sum$adj.r.squared
+        }
+        else {
+          ilr.sum$coefficients[j + n_levels + n_externals, ] <- res.sum$coefficients[(n_levels+n_externals+1), ]
+        }
+      }
+    }
+    if (is.null(factor_column) & is.null(external)){
+      ZV <- data.frame(cbind(y, X %>% rename_with(.cols = everything(), function(x){paste0("Internal.", x)})))
+      lmcla <- robustbase::lmrob(y ~ ., data = ZV, control = cont_lmrob)
+      lmcla.sum <- summary(lmcla)
+      ilr.sum <- lmcla.sum
+
+      for (j in 1:ncol(X)) {
+        Zj <- pivotCoord(cbind(X[, j], X[, -j]), method = pivot_norm)
+        dj <- data.frame(y = y, Z = Zj)
+        res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
+        res.sum <- summary(res)
+        if (j == 1) {
+          ilr.sum$coefficients[1:2, ] <- res.sum$coefficients[1:2, ]
+          ilr.sum$residuals <- res.sum$residuals
+          ilr.sum$sigma <- res.sum$sigma
+          ilr.sum$r.squared <- res.sum$r.squared
+          ilr.sum$adj.r.squared <- res.sum$adj.r.squared
+        }
+        else {
+          ilr.sum$coefficients[j + 1, ] <- res.sum$coefficients[2, ]
+        }
+      }
+    }
+    if (!is.null(factor_column) & is.null(external)){
+      X_selected <- X %>% select(-all_of(c(factor_column)))
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(factor_column))) %>% rename_with(.cols = colnames(X %>% select(all_of(factor_column))), function(x){paste0("Factor.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(factor_column)))), function(x){paste0("Internal.", x)})))
+      lmcla <- robustbase::lmrob(y ~ ., data = ZV, control = cont_lmrob)
+      lmcla.sum <- summary(lmcla)
+      ilr.sum <- lmcla.sum
+
+      for (j in 1:(ncol(X)-1)) {
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
+        ZVj <- data.frame(Factor = factor_col, Z = Zj)
+        dj <- data.frame(y = y, Z = ZVj)
+        res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
+        res.sum <- summary(res)
+        if (j == 1) {
+          ilr.sum$coefficients[1:(n_levels+1), ] <- res.sum$coefficients[1:(n_levels+1), ]
+          ilr.sum$residuals <- res.sum$residuals
+          ilr.sum$sigma <- res.sum$sigma
+          ilr.sum$r.squared <- res.sum$r.squared
+          ilr.sum$adj.r.squared <- res.sum$adj.r.squared
+        }
+        else {
+          ilr.sum$coefficients[j + n_levels, ] <- res.sum$coefficients[n_levels + 1, ]
+        }
+      }
+    }
+    if (is.null(factor_column) & !is.null(external)){
+      X_selected <- X %>% select(-all_of(c(external)))
+      ZV <- data.frame(cbind(y, X %>% relocate(all_of(c(external))) %>% rename_with(.cols = colnames(X %>% select(all_of(external))), function(x){paste0("External.", x)}) %>%
+                               rename_with(.cols = colnames(X %>% select(-all_of(c(external)))), function(x){paste0("Internal.", x)})))
+      lmcla <- robustbase::lmrob(y ~ ., data = ZV, control = cont_lmrob)
+      lmcla.sum <- summary(lmcla)
+      ilr.sum <- lmcla.sum
+
+      for (j in 1:(ncol(X)-n_externals)) {
+        Zj <- pivotCoord(cbind(X_selected[, j], X_selected[, -j]), method = pivot_norm)
+        ZVj <- data.frame(Externals = external_col, Z = Zj)
+        dj <- data.frame(y = y, Z = ZVj)
+        res <- robustbase::lmrob(y ~ ., data = dj, control = cont_lmrob)
+        res.sum <- summary(res)
+        if (j == 1) {
+          ilr.sum$coefficients[1:(n_externals+2), ] <- res.sum$coefficients[1:(n_externals+2), ]
+          ilr.sum$residuals <- res.sum$residuals
+          ilr.sum$sigma <- res.sum$sigma
+          ilr.sum$r.squared <- res.sum$r.squared
+          ilr.sum$adj.r.squared <- res.sum$adj.r.squared
+        }
+        else {
+          ilr.sum$coefficients[j + n_externals + 1, ] <- res.sum$coefficients[(n_externals+2), ]
+        }
+      }
+    }
+    list(lm = lmcla, lm = lmcla.sum, ilr = ilr.sum)
+  }
+
+  if (method == "classical") {
+    reg <- ilrregression(X, y, external, factor_column, pivot_norm)
+  }
+  else if (method == "robust") {
+    reg <- robilrregression(X, y, external, factor_column, pivot_norm)
+  }
+  if (exists("dat_missing")) {
+    message("There are ", n ," observations omitted due to missings in the target variable")
+  }
+  return(reg)
+}
+
+```
+
+## 2. Load data
+
+```{r}
+data("gemas")
+X <- dplyr::select(gemas, c(MeanTemp, soilclass, Al:Zr))
+y <- gemas$sand
+```
+
+## 3. Introduction of usage of the factor variable extension with LRCoDa
+
+With the newly released package `LRCoDa` we are able to use factor variables for the linear regression on raw compositional data. As in the function `lmCoDaX` from the package `robCompositions` we have the option between the "robust" and "classical" method.
+
+First, we show an example where we use the robust method on the dataset "gemas" and use the "soilclass" as the factor variable, the trace elements as composition and "sand" as the target variable.
+
+```{r, message=FALSE}
+X <- dplyr::select(gemas, c(soilclass, Al:Zr))
+y <- gemas$sand
+LR_robust_1 <- LRCoDa(y = y, X = X, factor_column = 'soilclass', method = 'robust', 
+                      max_refinement_steps = 500)
+LR_robust_1$ilr
+```
+
+We can access the summary output of the Linear Regression as known from the function `lmCoDaX` with \$ilr (for the ilr output) and \$lm (for the lm output). Furthermore, we can also clearly identify through the prefix of the variables which is the factor variable and which are the variables from the composition. 
+
+The output for the robust method looks differently to the output from the `lmCoDaX` function, since we use `lmrob` for the robust calculation of the linear regression in `LRCoDa` instead of `ltsReg` in `lmCoDaX`.
+
+### 3.1. Limitations of the factor variable usage
+
+We list a few scenarios in which we illustrate the limitations of the factor variable usage.
+
+#### 3.1.1. More than one factor variable is not allowed
+
+We only can use one factor variable for the model. We return an error message when more than one factor variable is used.
+
+```{r, error=TRUE, out.width=60}
+X <- dplyr::select(gemas, c(soilclass, COUNTRY, Al:Zr))
+LRCoDa(y = gemas$sand, X = X, factor_column = c('COUNTRY', 'soilclass'))
+```
+
+#### 3.1.2. Only characters and factors are allowed as datatype for the factor variable
+
+We only allow character and factor as datatypes for the factor variable for the model. We return an error message when a numerical values are contained in the factor variable.
+
+```{r, error=TRUE, out.width=60}
+X <- dplyr::select(gemas, c(MeanTemp, Al:Zr))
+LRCoDa(y = gemas$sand, X = X, factor_column = c('MeanTemp'))
+```
+
+#### 3.1.3. The factor has to be specified
+
+When the factor column is not specified in the function input, but X contains a variable with factors or characters the function returns an error message that "X contains non-numerical variables but there is no factor_column defined".
+
+```{r, error=TRUE, out.width=60}
+X <- dplyr::select(gemas, c(soilclass, Al:Zr))
+LRCoDa(y = gemas$sand, X = X)
+```
+
+#### 3.1.4. Factor column has to be specified as name in the function input
+
+The factor column has to be specified exactly like in the help function described. It is not possible to fill in the whole column.
+
+```{r, error=TRUE, out.width=60}
+X <- dplyr::select(gemas, c(soilclass, Al:Zr))
+LRCoDa(y = gemas$sand, X = X, factor_column = X %>% select(soilclass))
+```
+
+## 4. Introduction of usage of the external variable extension with LRCoDa
+
+With the newly released package `LRCoDa` we are also able to use external variables, which are not part of the composition. We have here also the option between the "robust" and "classical" method and we can combine it with a factor variable.
+
+We show an example where we combine external variables with a factor variables and of course the composition (naming as internal variables). We use the "gemas" dataset, where "MeanTemp" the external variable is, "soilclass" the factor variable, the trace elements the composition ("Internal" variables) and "sand" the target variable.
+
+```{r, message=FALSE}
+X <- dplyr::select(gemas, c(MeanTemp, soilclass, Al:Zr))
+y <- gemas$sand
+LR_robust_2 <- LRCoDa(y = y, X = X, external = c('MeanTemp'), factor_column = 'soilclass', 
+                      method = 'robust', max_refinement_steps = 500)
+LR_robust_2$ilr
+```
+
+We can observe here that all the different types of variable have the different prefix, where we can identify them without any problem.
+
+### 4.1 Possibilities and Limitations of the external variable usage
+
+We list the possibilities and the limitations of the external variable usage.
+
+#### 4.1.1. Multiple external variables are allowed and supported
+
+We allow and support the usage of multiple external variables in the same model.
+
+```{r, error=TRUE, out.width=60}
+X <- dplyr::select(gemas, c(MeanTemp, AnnPrec, Al:Zr))
+LRCoDa(y = gemas$sand, X = X, external = c('MeanTemp', 'AnnPrec'), 
+       max_refinement_steps = 500)
 ```
