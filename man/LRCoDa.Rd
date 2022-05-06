@@ -21,9 +21,11 @@ LRCoDa(
 
 \item{X}{The compositional and/or non-compositional predictors as a matrix, data.frame or numeric vector}
 
-\item{external}{Specify the columns which are not part of the composition and not factors}
+\item{external}{Specify the columns name of the external variable. The name has to be introduced as follows:
+external = c("variable_name"). Multiple selection is supported for the external variable.}
 
-\item{factor_column}{Specify the column which includes factor levels}
+\item{factor_column}{Specify the column name of the factor variable. The name has to be introduced as follows:
+factor_column = c("variable_name"). Multiple selection is invalid for the factor_column variable.}
 
 \item{method}{If \dQuote{robust}, the fast MM-type linear regression is applied, while with method
 \dQuote{classical}, the conventional least squares regression is applied.}
@@ -64,7 +66,7 @@ LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
 method='robust', pivot_norm = 'orthonormal')
 }
 \seealso{
-\code{\link{lm}} and \code{\link{lmrob}}
+\code{\link{lm}}, \code{\link{lmrob}} and \code{\link{pivotCoord}}
 }
 \author{
 Roman Wiedemeier

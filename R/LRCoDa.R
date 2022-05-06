@@ -20,8 +20,10 @@ NULL
 #' @aliases LRCoDa ilrregression robilrregression
 #' @param y The response which should be non-compositional
 #' @param X The compositional and/or non-compositional predictors as a matrix, data.frame or numeric vector
-#' @param external Specify the columns which are not part of the composition and not factors
-#' @param factor_column Specify the column which includes factor levels
+#' @param external Specify the columns name of the external variable. The name has to be introduced as follows:
+#' external = c("variable_name"). Multiple selection is supported for the external variable.
+#' @param factor_column Specify the column name of the factor variable. The name has to be introduced as follows:
+#' factor_column = c("variable_name"). Multiple selection is invalid for the factor_column variable.
 #' @param method If \dQuote{robust}, the fast MM-type linear regression is applied, while with method
 #' \dQuote{classical}, the conventional least squares regression is applied.
 #' @param pivot_norm if FALSE then the normalizing constant is not used, if TRUE sqrt((D-i)/(D-i+1))
@@ -31,7 +33,7 @@ NULL
 #' @return An object of class \sQuote{lmrob} or \sQuote{lm} and two summary
 #' objects.
 #' @author Roman Wiedemeier
-#' @seealso \code{\link{lm}} and \code{\link{lmrob}}
+#' @seealso \code{\link{lm}}, \code{\link{lmrob}} and \code{\link{pivotCoord}}
 #' @keywords models compositional data linear regression
 #' @export
 #' @examples
