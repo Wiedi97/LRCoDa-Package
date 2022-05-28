@@ -5,6 +5,7 @@
 #' @importFrom robustbase lmrob.control
 #' @importFrom robCompositions pivotCoord
 #' @importFrom sjmisc is_empty
+#' @importFrom forcats fct_recode
 NULL
 
 

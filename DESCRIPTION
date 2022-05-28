@@ -8,7 +8,8 @@ Imports:
     robCompositions,
     tidyr,
     robustbase, 
-    sjmisc
+    sjmisc,
+    forcats
 Author: person("Roman", "Wiedemeier", email="wiedemeier.roman@gmail.com", role=c("aut", "cre"))
 Maintainer: Roman Wiedemeier <wiedemeier.roman@gmail.com>
 Description: More about what it does (maybe more than one line)

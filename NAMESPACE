@@ -3,6 +3,7 @@
 export(LRCoDa)
 import(dplyr)
 import(tidyr)
+importFrom(forcats,fct_recode)
 importFrom(robCompositions,pivotCoord)
 importFrom(robustbase,lmrob)
 importFrom(robustbase,lmrob.control)
