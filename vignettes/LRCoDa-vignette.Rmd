@@ -38,19 +38,19 @@ gemas <- gemas %>%
 
 ## 3. Introduction of the use of the factor variable extension with LRCoDa
 
-With the newly released package `LRCoDa` we are able to use factor variables for linear regression on raw compositional data. As with the function `lmCoDaX` from the package `robCompositions` we have the choice between the "robust" and "classical" method.
+With the newly released package `LRCoDa` we are able to use factor variables for linear regression on raw compositional data. The factor variables however are not allowed as Internal variables of a compositions. Further, as with the function `lmCoDaX` from the package `robCompositions` we have the choice between the "robust" and "classical" method. 
 
 First, we show an example where we apply the robust method to the dataset "gemas" and use the "soilclass" as the factor variable, the trace elements as composition and "sand" as target variable.
 
 ```{r, message=FALSE}
 X <- dplyr::select(gemas, c(soilclass, Al:Zr))
 y <- gemas$sand
-LR_robust_1 <- LRCoDa(y = y, X = X, factor_column = 'soilclass', method = 'robust', 
+LR_robust_1 <- LRCoDa(y = y, X = X, external = 'soilclass', method = 'robust', 
                       max_refinement_steps = 500)
 LR_robust_1$ilr
 ```
 
-We can access the summary output of the Linear Regression as known from the function `lmCoDaX` with \$ilr (for the ilr output) and \$lm (for the lm output). In addition, we can clearly see which is the factor variable and which are the variables from the composition by the prefix of the variables. 
+We can access the summary output of the Linear Regression as known from the function `lmCoDaX` with \$ilr (for the ilr output) and \$lm (for the lm output). In addition, we can clearly see which is the external factor variable and which are the variables from the composition by the prefix of the variables. 
 
 The output of the robust method is further differentiated from the output using `lmCoDaX` because we use `lmrob` for the robust calculation of the linear regression in `LRCoDa` instead of `ltsReg` in `lmCoDaX`.
 
@@ -60,50 +60,41 @@ We list some scenarios where we show the limitations of using factor variables w
 
 #### 3.1.1. More than one factor variable is not allowed
 
-Only can one factor variable can be used for the model. We return an error message if more than one factor variable is used.
+Only one factor variable can be used for the model. The function automatically detect when two variables with datatype "Factor" and/or "Character" are. We return an error message if more than one factor variable is used.
 
 ```{r, error=TRUE, out.width=60}
 X <- dplyr::select(gemas, c(soilclass, COUNTRY, Al:Zr))
-LRCoDa(y = gemas$sand, X = X, factor_column = c('COUNTRY', 'soilclass'))
+LRCoDa(y = gemas$sand, X = X, external = c('COUNTRY', 'soilclass'))
 ```
 
-#### 3.1.2. Only characters and factors are allowed as datatypes for the factor variable
+#### 3.1.2. The factor has to be specified
 
-We only allow characters and factors as datatypes for the factor variable for the model. We return an error message if the factor variable contains a numeric value.
-
-```{r, error=TRUE, out.width=60}
-X <- dplyr::select(gemas, c(MeanTemp, Al:Zr))
-LRCoDa(y = gemas$sand, X = X, factor_column = c('MeanTemp'))
-```
-
-#### 3.1.3. The factor has to be specified
-
-When the factor column is not specified in the function input, but X contains a variable with factors or characters, the function returns an error message that "X contains non-numerical variables but there is no factor_column defined".
+When the external factor column is not specified in the function input, but X contains a variable with factors or characters, the function returns an error message that "Variable with datatype character or factor have to be defined as external".
 
 ```{r, error=TRUE, out.width=60}
 X <- dplyr::select(gemas, c(soilclass, Al:Zr))
 LRCoDa(y = gemas$sand, X = X)
 ```
 
-#### 3.1.4. Factor column must be specified as a name in the function input
+#### 3.1.3. Factor column must be specified as a name in the function input
 
-The factor column must be specified exactly as in the help function described. It is not possible to fill in the whole column.
+The external factor column must be specified exactly as in the help function described. It is not possible to fill in the whole column.
 
 ```{r, error=TRUE, out.width=60}
 X <- dplyr::select(gemas, c(soilclass, Al:Zr))
-LRCoDa(y = gemas$sand, X = X, factor_column = X %>% select(soilclass))
+LRCoDa(y = gemas$sand, X = X, external = X %>% select(soilclass))
 ```
 
 ## 4. Introduction of the use of the external variable extension with LRCoDa
 
-With the newly released package `LRCoDa` we are also able to use external variables that are not part of the composition. Here we also have the possibility to choose between the "robust" and "classical" method and can combine them with a factor variable.
+With the newly released package `LRCoDa` we are also able to use numerical external variables that are not part of the composition. Here we also have the possibility to choose between the "robust" and "classical" method and can combine them with a factor variable.
 
-We show an example where we combine external variables with a factor variables and of course the composition (naming as internal variables). We use the "gemas" dataset, where "MeanTemp" the external variable is, "soilclass" the factor variable, the trace elements the composition ("Internal" variables) and "sand" the target variable.
+We show an example where we combine external variables with a factor variables and of course the composition (naming as internal variables). The function automatically detects which variable is the factor variable from the external variables. We use the "gemas" dataset, where "MeanTemp" the external variable is, "soilclass" the factor variable, the trace elements the composition ("Internal" variables) and "sand" the target variable.
 
 ```{r, message=FALSE}
 X <- dplyr::select(gemas, c(MeanTemp, soilclass, Al:Zr))
 y <- gemas$sand
-LR_robust_2 <- LRCoDa(y = y, X = X, external = c('MeanTemp'), factor_column = 'soilclass', 
+LR_robust_2 <- LRCoDa(y = y, X = X, external = c('MeanTemp', 'soilclass'), 
                       method = 'robust', max_refinement_steps = 500)
 LR_robust_2$ilr
 ```
@@ -114,9 +105,9 @@ We can see here that the different types of variables have different prefixes wi
 
 We list the possibilities and limitations of using the external variables
 
-#### 4.1.1. Multiple external variables are allowed and supported
+#### 4.1.1. Multiple numerical external variables are allowed and supported
 
-We allow and support the use of multiple external variables in the same model.
+We allow and support the use of multiple numerical external variables in the same model.
 
 ```{r, error=TRUE, message=FALSE, out.width=60}
 X <- dplyr::select(gemas, c(MeanTemp, AnnPrec, Al:Zr))
@@ -124,17 +115,7 @@ LRCoDa(y = gemas$sand, X = X, external = c('MeanTemp', 'AnnPrec'),
        method = "classical")
 ```
 
-#### 4.1.2. Only numerical variables are allowed as External variables
-
-Only numeric variables are allowed for the external variables, as non-numeric variables are captured with the factor variables. We return an error message that says: "X contains non-numerical variables but there is no factor_column defined".
-
-```{r, error=TRUE, out.width=60}
-X <- dplyr::select(gemas, c(MeanTemp, AnnPrec, COUNTRY, Al:Zr))
-LRCoDa(y = gemas$sand, X = X, external = c('MeanTemp', 'AnnPrec', 'COUNTRY'), 
-       method = 'classical')
-```
-
-#### 4.1.3. External column has to be specified as name in the function input
+#### 4.1.2. External column has to be specified as name in the function input
 
 The external column must be specified exactly as in the help function described. It is not possible to fill in the whole column.
 
@@ -150,16 +131,16 @@ Also, `lmrob` determines robustness weights between 0 and 1, while `ltsReg` only
 
 ```{r, error=TRUE, message=FALSE, out.width=60}
 X <- dplyr::select(gemas, c(MeanTemp, AnnPrec, soilclass, Al:Zr))
-LRCoDa(y = gemas$sand, X = X, external = c('MeanTemp', 'AnnPrec'), 
-       factor_column = c('soilclass'), max_refinement_steps = 200)
+LRCoDa(y = gemas$sand, X = X, external = c('MeanTemp', 'AnnPrec', 'soilclass'), 
+       max_refinement_steps = 200)
 ```
 
 The algorithm does not converge with the default refinement steps 200 as defined in the function `lmrob`. Therefore, we implemented the parameter max_refinement_steps as input to the function `LRCoDa` to change the maximum steps in such cases.
 
 ```{r, error=TRUE, message=FALSE, out.width=60}
 X <- dplyr::select(gemas, c(MeanTemp, AnnPrec, soilclass, Al:Zr))
-LRCoDa(y = gemas$sand, X = X, external = c('MeanTemp', 'AnnPrec'), 
-       factor_column = c('soilclass'), max_refinement_steps = 500)
+LRCoDa(y = gemas$sand, X = X, external = c('MeanTemp', 'AnnPrec', 'soilclass'), 
+       max_refinement_steps = 500)
 ```
 
 And now with max_refinement_steps set to 500 the algorithm converges.
