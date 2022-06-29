@@ -10,7 +10,6 @@ LRCoDa(
   y,
   X,
   external = NULL,
-  factor_column = NULL,
   method = "robust",
   pivot_norm = "orthonormal",
   max_refinement_steps = 200
@@ -21,11 +20,9 @@ LRCoDa(
 
 \item{X}{The compositional and/or non-compositional predictors as a matrix, data.frame or numeric vector}
 
-\item{external}{Specify the columns name of the external variable. The name has to be introduced as follows:
-external = c("variable_name"). Multiple selection is supported for the external variable.}
-
-\item{factor_column}{Specify the column name of the factor variable. The name has to be introduced as follows:
-factor_column = c("variable_name"). Multiple selection is invalid for the factor_column variable.}
+\item{external}{Specify the columns name of the external variables. The name has to be introduced as follows:
+external = c("variable_name"). Multiple selection is supported for the external variable. Factor variables are
+automatically detected.}
 
 \item{method}{If \dQuote{robust}, the fast MM-type linear regression is applied, while with method
 \dQuote{classical}, the conventional least squares regression is applied.}
@@ -60,9 +57,9 @@ gemas$COUNTRY <- as.factor(gemas$COUNTRY)
 gemas_GER <- dplyr::filter(gemas, gemas$COUNTRY == 'GER')
 y <- gemas_GER$sand
 X <- dplyr::select(gemas_GER, c(MeanTemp, soilclass, Al:Zr))
-LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
+LRCoDa(y, X, external = c('MeanTemp', 'soilclass'),
 method='classical', pivot_norm = 'orthonormal')
-LRCoDa(y, X, external = c('MeanTemp'), factor_column = 'soilclass',
+LRCoDa(y, X, external = c('MeanTemp', 'soilclass'),
 method='robust', pivot_norm = 'orthonormal')
 }
 \seealso{
