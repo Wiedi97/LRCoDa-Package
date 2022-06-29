@@ -10,7 +10,7 @@ data(gemas)
 
 X <- dplyr::select(gemas, c(MeanTemp, soilclass, Al:Zr))
 
-lr <- LRCoDa(y = gemas$sand, X, external = c('MeanTemp'), factor_column = 'soilclass')
+lr <- LRCoDa(y = gemas$sand, X, external = c('MeanTemp', 'soilclass'))
 
 ## What is newly released regarding to the lmCoDaX function from the robComposition Package
 - Use linear regression for compositional and non-compositional in the same model
